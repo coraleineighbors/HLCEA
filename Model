@@ -1,0 +1,121 @@
+# Set up
+#!pip install openpyxl
+import openpyxl
+import pandas as pd
+
+# Getting Country-Specific Input Data
+# Create a dictionary that maps countries to their respective GitHub raw file URLs
+country_file_urls = {
+    'Nigeria': 'https://raw.githubusercontent.com/coraleineighbors/HLCEA/main/Inputs/Inputs_Nigeria.xlsx'  # Correct raw URL
+}
+
+# Function to download the file from GitHub
+def download_file_from_github(country):
+    url = country_file_urls.get(country)
+    if url:
+        print(f"Accessing URL: {url}")  # Print the URL for debugging
+        destination = f'Inputs_{country}.xlsx'  # Name to save the file locally
+        try:
+            # Specify the engine to read the Excel file
+            data = pd.read_excel(url, engine='openpyxl')  # Specify the engine
+            data.to_excel(destination, index=False)  # Save the file locally
+            return destination
+        except Exception as e:
+            print(f"Error accessing the file: {e}")  # Print the error
+            raise
+    else:
+        raise ValueError(f"No URL found for {country}")
+
+# Test
+country = 'Nigeria'
+file_path = download_file_from_github(country)
+print(f'File downloaded and saved as: {file_path}')
+
+# Variables/Tables
+# Function to select file path based on the country
+def load_country_data(country):
+    # Get the file path for the selected country
+    url = country_file_urls.get(country)
+
+    if url:
+        # Load the Excel file directly from the URL
+        excel_data = pd.ExcelFile(url)
+
+        # Get the sheet names
+        sheet_names = excel_data.sheet_names
+
+        # Load the Variables sheet and parse it into a dictionary with additional "Lows" and "Highs"
+        variables_df = excel_data.parse('Variables')
+
+        # Create a dictionary with Root Definition, Lows, and Highs
+        variables_dict = variables_df.set_index('Name')[['Root Definition', 'Low', 'High']].to_dict(orient='index')
+
+        # Create individual DataFrames for each table sheet
+        t_HA_discontinuation = excel_data.parse('t_HA_discontinuation')
+        t_HAUptake = excel_data.parse('t_HAUptake')
+        t_pCHLAfterCSOM = excel_data.parse('t_pCHLAfterCSOM')
+        t_SNHL_Meningitis = excel_data.parse('t_SNHL_Meningitis')
+        t_SNHL_prev = excel_data.parse('t_SNHL_prev')
+        tAgeStart_US = excel_data.parse('tAgeStart_US')
+        tAOM_Inc = excel_data.parse('tAOM_Inc')
+        tCHLInc_Other = excel_data.parse('tCHLInc_Other')
+        tCSOM_Inc_Given_rAOMpOME = excel_data.parse('tCSOM_Inc_Given_rAOMpOME')
+        tmort = excel_data.parse('tmort')
+        tNewbornHL = excel_data.parse('tNewbornHL')
+        tSex_US = excel_data.parse('tSex_US')
+        tSNHL_Inc = excel_data.parse('tSNHL_Inc')
+        tSNHLDeclineMult = excel_data.parse('tSNHLDeclineMult')
+        tSpontOMEInc = excel_data.parse('tSpontOMEInc')
+
+        return variables_dict, {
+            't_HA_discontinuation': t_HA_discontinuation,
+            't_HAUptake': t_HAUptake,
+            't_pCHLAfterCSOM': t_pCHLAfterCSOM,
+            't_SNHL_Meningitis': t_SNHL_Meningitis,
+            't_SNHL_prev': t_SNHL_prev,
+            'tAgeStart_US': tAgeStart_US,
+            'tAOM_Inc': tAOM_Inc,
+            'tCHLInc_Other': tCHLInc_Other,
+            'tCSOM_Inc_Given_rAOMpOME': tCSOM_Inc_Given_rAOMpOME,
+            'tmort': tmort,
+            'tNewbornHL': tNewbornHL,
+            'tSex_US': tSex_US,
+            'tSNHL_Inc': tSNHL_Inc,
+            'tSNHLDeclineMult': tSNHLDeclineMult,
+            'tSpontOMEInc': tSpontOMEInc
+        }
+    else:
+        raise ValueError(f"No URL found for {country}")
+
+# Test
+country = 'Nigeria'
+variables_dict, tables_dict = load_country_data(country)
+
+# Example of inspecting variables with Lows and Highs for Nigeria
+example_variable = list(variables_dict.items())[:5]  # Show first 5 variables as example
+print(example_variable)
+print(tables_dict)
+print(tables_dict['t_HA_discontinuation'].head())
+
+# Model
+def model_function_with_country_expanded(age, years_using_hearing_aid, country):
+    # Retrieve country-specific variable (like cost of audiology test)
+    audiology_test_cost = get_variable_value_by_country('cAudiologyTest', country)
+    adult_screen_test_cost = get_variable_value_by_country('cAdultScreenTest', country)
+
+    # Retrieve country-specific table value (like probability of hearing aid discontinuation)
+    ha_discontinuation_prob = get_table_value_by_country('t_HA_discontinuation', 'Years after use', years_using_hearing_aid, 'P d/c', country)
+
+    # Example formula: Adjusting both audiology and screening test costs
+    if audiology_test_cost and adult_screen_test_cost and ha_discontinuation_prob:
+        adjusted_cost = (float(audiology_test_cost) + float(adult_screen_test_cost)) * (1 - float(ha_discontinuation_prob))
+    else:
+        adjusted_cost = None  # Handle cases where data is missing
+
+    return adjusted_cost
+
+# Example use case: Calculate the adjusted cost for China and Nigeria
+cost_china = model_function_with_country_expanded(30, 3, 'China')
+cost_nigeria = model_function_with_country_expanded(30, 3, 'Nigeria')
+
+cost_china, cost_nigeria
